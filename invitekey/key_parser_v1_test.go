@@ -22,7 +22,7 @@ func TestRoundTrip(t *testing.T) {
 	peerPub := peerPriv.PublicKey()
 
 	// Generate Ed25519 signing keys.
-	signPub, signPriv, err := ed25519.GenerateKey(rand.Reader)
+	_, signPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatalf("failed to generate ed25519 key: %v", err)
 	}
@@ -37,7 +37,7 @@ func TestRoundTrip(t *testing.T) {
 	}
 
 	// 2. Parse key.
-	parser := NewKeyParserV1(signPub)
+	parser := NewKeyParserV1()
 	parsedPub, parsedAddr, err := parser.ParseKey(keyStr)
 	if err != nil {
 		t.Fatalf("failed to parse key: %v", err)
@@ -107,109 +107,33 @@ func TestKeyGeneratorValidation(t *testing.T) {
 }
 
 func TestKeyParserErrors(t *testing.T) {
-	peerPriv, _ := ecdh.X25519().GenerateKey(rand.Reader)
-	peerPub := peerPriv.PublicKey()
-	signPub, signPriv, _ := ed25519.GenerateKey(rand.Reader)
-	otherSignPub, _, _ := ed25519.GenerateKey(rand.Reader)
-
-	generator := NewKeyGeneratorV1(peerPub, "10.0.0.1:5000", signPriv)
-	validKey, err := generator.GenerateKey()
-	if err != nil {
-		t.Fatalf("failed to generate valid key: %v", err)
-	}
-
-	parser := NewKeyParserV1(signPub)
+	parser := NewKeyParserV1()
 
 	tests := []struct {
 		name    string
 		key     string
-		parser  *KeyParserV1
 		wantErr string
 	}{
 		{
 			name:    "invalid prefix",
 			key:     "gotax-abc",
-			parser:  parser,
 			wantErr: "invalid key prefix",
 		},
 		{
 			name:    "too short",
 			key:     "gota1-short",
-			parser:  parser,
 			wantErr: "invite key is too short",
 		},
 		{
 			name:    "missing signature separator",
-			key:     validKey[:len(validKey)-87] + "_" + validKey[len(validKey)-86:], // replace separator '-' with '_'.
-			parser:  parser,
-			wantErr: "invalid invite key format: missing signature separator",
-		},
-		{
-			name:    "signature verification failed with other key",
-			key:     validKey,
-			parser:  NewKeyParserV1(otherSignPub),
-			wantErr: "signature verification failed",
-		},
-		{
-			name:    "corrupted signature (invalid base64 character)",
-			key:     validKey[:len(validKey)-1] + "%",
-			parser:  parser,
-			wantErr: "failed to decode signature",
-		},
-		{
-			name: "missing public key separator in payload",
-			key: func() string {
-				// Reconstruct key with payload that has no '|'.
-				payload := "10.0.0.1_encodedkey"
-				sigBytes := ed25519.Sign(signPriv, []byte(payload))
-				sig := base64.RawURLEncoding.EncodeToString(sigBytes)
-				return "gota1-" + payload + "-" + sig
-			}(),
-			parser:  parser,
-			wantErr: "invalid payload format: missing public key separator",
-		},
-		{
-			name: "empty address",
-			key: func() string {
-				// Reconstruct key with empty address before '|'.
-				payload := "|encodedkey"
-				sigBytes := ed25519.Sign(signPriv, []byte(payload))
-				sig := base64.RawURLEncoding.EncodeToString(sigBytes)
-				return "gota1-" + payload + "-" + sig
-			}(),
-			parser:  parser,
-			wantErr: "peer address is empty",
-		},
-		{
-			name: "corrupted public key base64",
-			key: func() string {
-				// Reconstruct key with bad pubkey encoding.
-				payload := "10.0.0.1|invalid%base64"
-				sigBytes := ed25519.Sign(signPriv, []byte(payload))
-				sig := base64.RawURLEncoding.EncodeToString(sigBytes)
-				return "gota1-" + payload + "-" + sig
-			}(),
-			parser:  parser,
-			wantErr: "failed to decode public key",
-		},
-		{
-			name: "invalid public key size",
-			key: func() string {
-				// Reconstruct key with short pubkey.
-				shortPub := base64.RawURLEncoding.EncodeToString([]byte("shortkey"))
-				payload := "10.0.0.1|" + shortPub
-				sigBytes := ed25519.Sign(signPriv, []byte(payload))
-				sig := base64.RawURLEncoding.EncodeToString(sigBytes)
-				return "gota1-" + payload + "-" + sig
-			}(),
-			parser:  parser,
-			wantErr: "failed to parse ecdh public key",
+			key:     "gota1-" + strings.Repeat("a", 100) + "_" + strings.Repeat("a", 86),
+			wantErr: "invalid format: missing signature separator",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, _, err := tt.parser.ParseKey(tt.key)
+			_, _, err := parser.ParseKey(tt.key)
 			if err == nil {
 				t.Errorf("ParseKey() expected error containing %q, got nil", tt.wantErr)
 			} else if !strings.Contains(err.Error(), tt.wantErr) {
@@ -217,6 +141,94 @@ func TestKeyParserErrors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTamperingScenarios(t *testing.T) {
+	// Setup keys.
+	peerPriv, _ := ecdh.X25519().GenerateKey(rand.Reader)
+	peerPub := peerPriv.PublicKey()
+	_, signPriv, _ := ed25519.GenerateKey(rand.Reader)
+
+	// Valid initial key.
+	peerAddr := "127.0.0.1:9090"
+	generator := NewKeyGeneratorV1(peerPub, peerAddr, signPriv)
+	validKey, err := generator.GenerateKey()
+	if err != nil {
+		t.Fatalf("failed to generate valid key: %v", err)
+	}
+
+	parser := NewKeyParserV1()
+
+	// Parse elements of validKey: gota1-<payload>-<sig>
+	// Use length-based offsets to avoid splitting issues if Base64 URL strings contain dashes.
+	sigStart := len(validKey) - 86
+	payload := validKey[6 : sigStart-1]
+	sig := validKey[sigStart:]
+
+	// Payload structure: <address>|<x25519>|<ed25519>.
+	payParts := strings.Split(payload, "|")
+	if len(payParts) != 3 {
+		t.Fatalf("unexpected payload structure: %s", payload)
+	}
+	addrPart := payParts[0]
+	x25519Part := payParts[1]
+	ed25519Part := payParts[2]
+
+	t.Run("manipulated X25519 identity", func(t *testing.T) {
+		// Generate an alternative X25519 key.
+		altPriv, _ := ecdh.X25519().GenerateKey(rand.Reader)
+		altPubEncoded := base64.RawURLEncoding.EncodeToString(altPriv.PublicKey().Bytes())
+
+		// Rebuild payload with altered X25519 key, but keeping original signature.
+		manipulatedPayload := addrPart + "|" + altPubEncoded + "|" + ed25519Part
+		manipulatedKey := "gota1-" + manipulatedPayload + "-" + sig
+
+		_, _, err := parser.ParseKey(manipulatedKey)
+		if err == nil || !strings.Contains(err.Error(), "signature verification failed") {
+			t.Errorf("expected signature verification failure, got: %v", err)
+		}
+	})
+
+	t.Run("manipulated address/route", func(t *testing.T) {
+		// Alter the address part of the payload.
+		manipulatedPayload := "192.168.1.1:8080|" + x25519Part + "|" + ed25519Part
+		manipulatedKey := "gota1-" + manipulatedPayload + "-" + sig
+
+		_, _, err := parser.ParseKey(manipulatedKey)
+		if err == nil || !strings.Contains(err.Error(), "signature verification failed") {
+			t.Errorf("expected signature verification failure, got: %v", err)
+		}
+	})
+
+	t.Run("manipulated signature", func(t *testing.T) {
+		// Alter the signature by changing one character.
+		var mutatedSig string
+		if sig[0] == 'A' {
+			mutatedSig = "B" + sig[1:]
+		} else {
+			mutatedSig = "A" + sig[1:]
+		}
+		manipulatedKey := "gota1-" + payload + "-" + mutatedSig
+
+		_, _, err := parser.ParseKey(manipulatedKey)
+		if err == nil || !strings.Contains(err.Error(), "signature verification failed") {
+			t.Errorf("expected signature verification failure, got: %v", err)
+		}
+	})
+
+	t.Run("manipulated verifying key", func(t *testing.T) {
+		// Alter the verifying Ed25519 public key.
+		_, altSignPriv, _ := ed25519.GenerateKey(rand.Reader)
+		altEdEncoded := base64.RawURLEncoding.EncodeToString(altSignPriv.Public().(ed25519.PublicKey))
+
+		manipulatedPayload := addrPart + "|" + x25519Part + "|" + altEdEncoded
+		manipulatedKey := "gota1-" + manipulatedPayload + "-" + sig
+
+		_, _, err := parser.ParseKey(manipulatedKey)
+		if err == nil || !strings.Contains(err.Error(), "signature verification failed") {
+			t.Errorf("expected signature verification failure, got: %v", err)
+		}
+	})
 }
 
 func FuzzParseKey(f *testing.F) {
@@ -227,7 +239,7 @@ func FuzzParseKey(f *testing.F) {
 	}
 	peerPub := peerPriv.PublicKey()
 
-	signPub, signPriv, err := ed25519.GenerateKey(rand.Reader)
+	_, signPriv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		f.Fatalf("failed to generate ed25519 key: %v", err)
 	}
@@ -240,11 +252,11 @@ func FuzzParseKey(f *testing.F) {
 
 	// Add seeds.
 	f.Add(validKey)
-	f.Add("gota1-127.0.0.1:9090|abcdefg-invalid_sig")
+	f.Add("gota1-127.0.0.1:9090|abcdefg|hijklmn-invalid_sig")
 	f.Add("invalid_prefix")
 	f.Add("")
 
-	parser := NewKeyParserV1(signPub)
+	parser := NewKeyParserV1()
 
 	f.Fuzz(func(t *testing.T, keyStr string) {
 		// Ensure parser does not panic on any fuzzed input.

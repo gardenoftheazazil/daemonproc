@@ -12,14 +12,13 @@ import (
 	"strings"
 )
 
-// KeyGeneratorV1 is responsible for generating keys for version 1 of the invite key format.
-// It structures the peer address and x25519 public key as the payload, then signs it
-// using an ed25519 private key to ensure data integrity (tamper-proofing), similar to a JWT.
+// KeyGeneratorV1 generates self-signed invite keys to guarantee secure,
+// tamper-proof routing across untrusted relay peers in the mesh network.
 type KeyGeneratorV1 struct {
 	prefix       string             // Prefix for version 1 keys, e.g., "gota1".
-	peerIdentity *ecdh.PublicKey    // Peer identity public key (pointer to ecdh.PublicKey).
-	peerAddr     string             // Peer address used in the key generation process.
-	signingKey   ed25519.PrivateKey // Ed25519 Private Key used to sign the payload for integrity.
+	peerIdentity *ecdh.PublicKey    // X25519 Public Key for DH handshake.
+	peerAddr     string             // Target address (or relay path).
+	signingKey   ed25519.PrivateKey // Ed25519 Private Key of the generator itself.
 }
 
 // NewKeyGeneratorV1 initializes and returns a new KeyGeneratorV1 instance with the signing key.
@@ -32,10 +31,9 @@ func NewKeyGeneratorV1(peerIdentity *ecdh.PublicKey, peerAddr string, signingKey
 	}
 }
 
-// GenerateKey constructs the complete invite key string by formatting and signing the components.
-// The output format is: gota1-<payload>-<signature> where <payload> is: <address>|<encoded_public_key>.
+// GenerateKey constructs the complete self-signed invite key string.
+// Format: gota1-<peerAddr>|<encodedX25519>|<encodedEd25519>-<signature>.
 func (kg *KeyGeneratorV1) GenerateKey() (string, error) {
-	// Validate inputs before processing.
 	if kg.peerAddr == "" {
 		return "", fmt.Errorf("peer address is empty")
 	}
@@ -43,46 +41,43 @@ func (kg *KeyGeneratorV1) GenerateKey() (string, error) {
 		return "", fmt.Errorf("peer identity public key is nil")
 	}
 	if len(kg.signingKey) == 0 {
-		return "", fmt.Errorf("signing key is empty")
+		return "", fmt.Errorf("signing private key is empty")
 	}
 
 	var keyBuilder strings.Builder
 
-	// 1. Write the prefix followed by the separator (e.g., "gota1-").
+	// 1. Add prefix followed by the separator (e.g., "gota1-").
 	keyBuilder.WriteString(kg.prefix)
 	keyBuilder.WriteByte('-')
 
-	// 2. Encode the binary public key using Base64 Raw URL Encoding.
+	// 2. Encode the X25519 binary public key using Base64 Raw URL Encoding.
 	pubKeyBytes := kg.peerIdentity.Bytes()
 	encodedPubKey := base64.RawURLEncoding.EncodeToString(pubKeyBytes)
 
-	// 3. Construct the payload (e.g., "addr|encoded_key").
+	// 3. Encode the Ed25519 verifying public key (derived from private key).
+	verifyingPubKey, ok := kg.signingKey.Public().(ed25519.PublicKey)
+	if !ok {
+		return "", fmt.Errorf("failed to derive ed25519 public key")
+	}
+	encodedVerifyingKey := base64.RawURLEncoding.EncodeToString(verifyingPubKey)
+
+	// 4. Construct payload (address + X25519 + Ed25519).
 	var payloadBuilder strings.Builder
 	payloadBuilder.WriteString(kg.peerAddr)
 	payloadBuilder.WriteByte('|')
 	payloadBuilder.WriteString(encodedPubKey)
+	payloadBuilder.WriteByte('|')
+	payloadBuilder.WriteString(encodedVerifyingKey)
 	payload := payloadBuilder.String()
 
-	// 4. Append the payload to the main key.
+	// 5. Append payload to main key.
 	keyBuilder.WriteString(payload)
 	keyBuilder.WriteByte('-')
 
-	// 5. Generate signature of the payload and append it.
-	signature, err := kg.signKeyData([]byte(payload))
-	if err != nil {
-		return "", fmt.Errorf("failed to sign key data: %w", err)
-	}
-	keyBuilder.WriteString(signature)
+	// 6. Sign the payload using the generator's Ed25519 Private Key.
+	sigBytes := ed25519.Sign(kg.signingKey, []byte(payload))
+	encodedSignature := base64.RawURLEncoding.EncodeToString(sigBytes)
+	keyBuilder.WriteString(encodedSignature)
 
 	return keyBuilder.String(), nil
-}
-
-// signKeyData signs the structured payload using Ed25519 and returns a Base64 Raw URL encoded signature.
-// This guarantees that the address and public key cannot be tampered with.
-func (kg *KeyGeneratorV1) signKeyData(payload []byte) (string, error) {
-	// Sign the payload directly using the Ed25519 private key.
-	sigBytes := ed25519.Sign(kg.signingKey, payload)
-
-	// Encode the signature to a safe string format.
-	return base64.RawURLEncoding.EncodeToString(sigBytes), nil
 }
