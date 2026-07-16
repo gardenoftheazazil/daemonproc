@@ -1,0 +1,15 @@
+# CODEOWNERS — https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Each line is a file pattern followed by one or more owners.
+# Order matters: later matches take precedence.
+
+# Default owner for everything
+* @Akif-jpg
+
+# Core networking and crypto — requires careful review
+/interfaces/ @Akif-jpg
+
+# CI/CD and build configuration
+/.github/ @Akif-jpg
+Makefile @Akif-jpg
+.golangci.yml @Akif-jpg

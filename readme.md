@@ -1,11 +1,123 @@
 # Garden of the Azazil — DaemonProc
 
-A peer-to-peer networking daemon providing NAT traversal, cryptographic handshakes, and secure UDP transport.
+[![CI](https://github.com/gardenoftheazazil/daemonproc/actions/workflows/ci.yml/badge.svg)](https://github.com/gardenoftheazazil/daemonproc/actions/workflows/ci.yml)
+[![Go Version](https://img.shields.io/github/go-mod/go-version/gardenoftheazazil/daemonproc)](https://go.dev/)
+[![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+[![Go Report Card](https://goreportcard.com/badge/github.com/gardenoftheazazil/daemonproc)](https://goreportcard.com/report/github.com/gardenoftheazazil/daemonproc)
 
-## License
+**Serverless, decentralized, end-to-end encrypted peer-to-peer communication daemon.**
 
-This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
-See the [LICENSE](license.md) file for the full license text.
+DaemonProc is the core networking daemon of the **Garden of the Azazil (GOTA)** ecosystem. It enables applications to communicate directly with each other across the internet — without any central server — using NAT traversal, cryptographic handshakes, and end-to-end encryption.
+
+---
+
+## Vision
+
+We're building a standard for **app-to-app P2P communication** that is:
+
+- 🔒 **End-to-End Encrypted** — No one can read your data, not even us
+- 🌐 **Serverless** — No central server, no single point of failure
+- ⚡ **Fast** — Direct peer connections via UDP with NAT traversal
+- 🧩 **App-Agnostic** — Any application can use GOTA through a standard library
+
+### Future Roadmap
+
+The long-term mission extends beyond simple P2P:
+
+```
+Phase 1 (Current)     Phase 2              Phase 3
+─────────────────     ─────────────        ─────────────
+P2P E2EE              Mesh Network         Distributed
+App-to-App    ───►    TURN/Relay    ───►   Infrastructure
+Communication         Fallback             & Protocol Std
+```
+
+---
+
+## Architecture
+
+DaemonProc is one component in the GOTA ecosystem. Applications never touch the network directly — they communicate through a local daemon via Unix sockets.
+
+```
+    Machine A                                        Machine B
+┌──────────────────┐                          ┌──────────────────┐
+│                  │                          │                  │
+│  ┌────────────┐  │                          │  ┌────────────┐  │
+│  │  Your App  │  │                          │  │  Peer App  │  │
+│  │            │  │                          │  │            │  │
+│  └─────┬──────┘  │                          │  └─────┬──────┘  │
+│        │         │                          │        │         │
+│   Unix Socket    │                          │   Unix Socket    │
+│   (libgota)      │                          │   (libgota)      │
+│        │         │                          │        │         │
+│  ┌─────▼──────┐  │    UDP / P2P / E2EE     │  ┌─────▼──────┐  │
+│  │ DaemonProc │◄─┼────────────────────────►─┤  │ DaemonProc │  │
+│  │            │  │  NAT Punch + Handshake   │  │            │  │
+│  └────────────┘  │  Noise Protocol IKpsk2   │  └────────────┘  │
+│                  │                          │                  │
+└──────────────────┘                          └──────────────────┘
+```
+
+### Components
+
+| Component | Repository | Description |
+|-----------|-----------|-------------|
+| **DaemonProc** | This repo | Background daemon handling P2P networking, NAT traversal, and E2EE |
+| **libgota** | *(coming soon)* | Client library (`.dll` / `.so`) that applications link against for IPC |
+
+### How It Works
+
+1. **Your app** links against `libgota` and writes data to a Unix socket
+2. **DaemonProc** reads from the socket, encrypts the data, and sends it over UDP
+3. **NAT Punching** establishes a direct connection between peers
+4. **Noise Protocol (IKpsk2)** performs the cryptographic handshake
+5. **ChaCha20-Poly1305** encrypts all traffic end-to-end
+6. **Remote DaemonProc** decrypts and delivers to the peer app via its Unix socket
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+| Tool | Version | Install |
+|------|---------|---------|
+| Go | 1.26.5+ | [go.dev/dl](https://go.dev/dl/) |
+| golangci-lint | v2.x | [golangci-lint.run](https://golangci-lint.run/welcome/install/) |
+| GNU Make | Any | Pre-installed on Linux/macOS; [Windows](https://gnuwin32.sourceforge.net/packages/make.htm) |
+
+### Quick Start
+
+```bash
+# Clone
+git clone https://github.com/gardenoftheazazil/daemonproc.git
+cd daemonproc
+
+# Install dependencies
+make deps
+
+# Run all checks
+make check
+
+# See all available commands
+make help
+```
+
+### Available Make Targets
+
+```
+  fmt             Format all Go source files.
+  lint            Run golangci-lint on all packages.
+  vet             Run go vet on all packages.
+  test            Run all tests with race detector.
+  test-short      Run tests in short mode.
+  cover           Run tests with coverage report.
+  build           Build the daemon binary.
+  deps            Download and tidy Go module dependencies.
+  deps-upgrade    Upgrade all dependencies.
+  check           Run all quality checks (CI equivalent).
+  clean           Remove build artifacts and coverage files.
+```
 
 ---
 
@@ -13,15 +125,16 @@ See the [LICENSE](license.md) file for the full license text.
 
 All contributions **must** comply with the following rules. Pull requests that violate these rules will be **automatically rejected** by the CI pipeline.
 
-### 1. Linting — golangci-lint
+### Linting — golangci-lint
 
 Every file must pass `golangci-lint run ./...` with zero issues. The full configuration is defined in [`.golangci.yml`](.golangci.yml).
 
-Below is a summary of the enforced rule categories:
+<details>
+<summary><strong>📋 Click to expand: Full rule breakdown</strong></summary>
 
-#### 1.1 License Header
+#### License Header
 
-Every `.go` file must begin with the following header:
+Every `.go` file must begin with:
 
 ```go
 // Copyright (c) <year> Garden of the Azazil. All rights reserved.
@@ -29,165 +142,108 @@ Every `.go` file must begin with the following header:
 // See LICENSE file in the project root for full license information.
 ```
 
-**Enforced by:** `goheader`
+#### Documentation Comments
 
-#### 1.2 Documentation Comments
+| Rule | Enforced By |
+|------|-------------|
+| All exported symbols must have doc comments | `revive`, `stylecheck` |
+| Every package must have a package comment | `revive`, `stylecheck` |
+| All comments must end with a period | `godot` |
 
-| Rule | Description | Enforced By |
-|------|-------------|-------------|
-| All exported types, functions, methods, and variables must have doc comments | Matches Go convention and Effective Go guidelines | `revive (exported)`, `stylecheck (ST1020-ST1023)` |
-| Every package must have a package-level comment | Typically placed in a `doc.go` file | `revive (package-comments)`, `stylecheck (ST1000)` |
-| All comments must end with a period | Standard Go documentation convention | `godot` |
+#### Naming Conventions
 
-#### 1.3 Naming Conventions
+| Rule | Enforced By |
+|------|-------------|
+| Go naming conventions (`camelCase` / `PascalCase`) | `revive`, `stylecheck` |
+| Error types must end with `Error` suffix | `errname` |
+| Error variables must be named `errXxx` | `stylecheck` |
+| Error strings must start with lowercase | `revive`, `stylecheck` |
+| Consistent receiver names | `revive`, `stylecheck` |
+| No shadowing predeclared identifiers | `predeclared` |
 
-| Rule | Description | Enforced By |
-|------|-------------|-------------|
-| Variable and function names must follow Go conventions | `camelCase` for unexported, `PascalCase` for exported | `revive (var-naming)`, `stylecheck (ST1003)` |
-| Error types must end with `Error` suffix | e.g., `ConnectionError`, `TimeoutError` | `errname` |
-| Error variables must be named `errXxx` | e.g., `errNotFound`, `errTimeout` | `stylecheck (ST1012)` |
-| Error strings must start with lowercase | e.g., `"connection refused"` not `"Connection refused"` | `revive (error-strings)`, `stylecheck (ST1005)` |
-| Receiver names must be consistent across methods | e.g., always `s` for `*Server`, not mixed | `revive (receiver-naming)`, `stylecheck (ST1016)` |
-| Do not shadow predeclared identifiers | e.g., do not use `len`, `cap`, `error` as variable names | `predeclared` |
-
-#### 1.4 Import Rules
-
-Imports must be grouped in the following order, separated by blank lines:
+#### Import Ordering
 
 ```go
 import (
-    // Standard library
-    "context"
-    "fmt"
-
-    // Third-party dependencies
-    "golang.org/x/crypto/nacl/box"
-
-    // Project-internal packages
-    "github.com/gardenoftheazazil/daemonproc/interfaces"
+    "context"                                          // stdlib
+    "golang.org/x/crypto/nacl/box"                     // third-party
+    "github.com/gardenoftheazazil/daemonproc/interfaces" // project
 )
 ```
 
-**Enforced by:** `gci`, `goimports`
+#### Formatting & Style
 
-#### 1.5 Line Length
+| Rule | Details |
+|------|---------|
+| Max line length | 120 characters |
+| Formatting | `gofmt` (tabs) |
+| Line endings | LF only |
+| No `fmt.Print*` in production | Use structured logger |
+| No `panic()` | Return errors instead |
 
-Maximum line length is **120 characters**. Exceptions:
-- `package` and `import` statements
-- Comments containing long URLs
+#### Error Handling
 
-**Enforced by:** `lll`
+| Rule | Enforced By |
+|------|-------------|
+| All errors must be checked | `errcheck` |
+| Wrap errors with `%w` | `errorlint` |
+| Use `errors.Is()` for comparison | `errorlint` |
+| Close HTTP response bodies | `bodyclose` |
 
-#### 1.6 Formatting
+#### Complexity Limits
 
-- All code must be formatted with `gofmt` (tabs, not spaces).
-- Line endings must be **LF** (`\n`), not CRLF.
-- No trailing whitespace.
-- No consecutive blank lines inside functions.
+| Metric | Threshold |
+|--------|-----------|
+| Cognitive complexity | ≤ 30 |
+| Cyclomatic complexity | ≤ 15 |
+| Nested if depth | ≤ 5 |
 
-**Enforced by:** `gofmt`, `whitespace`
+</details>
 
-#### 1.7 Forbidden Patterns
-
-| Pattern | Reason | Alternative |
-|---------|--------|-------------|
-| `fmt.Print`, `fmt.Println`, `fmt.Printf` | Not suitable for production logging | Use a structured logger (`slog`, `zerolog`, `zap`) |
-| `os.Stdout`, `os.Stderr` | Direct stream writes bypass logging | Use a structured logger |
-| `panic()` | Uncontrolled crash | Return an `error` instead |
-
-**Exception:** `main.go` and test files are exempt from `forbidigo`.
-
-**Enforced by:** `forbidigo`
-
-#### 1.8 Error Handling
-
-| Rule | Description | Enforced By |
-|------|-------------|-------------|
-| All returned errors must be checked | No silently ignoring errors | `errcheck` |
-| Use `fmt.Errorf("...: %w", err)` for wrapping | Enables `errors.Is` / `errors.As` chain | `errorlint` |
-| Use `errors.Is()` instead of `==` for comparison | Supports wrapped error chains | `errorlint` |
-| Do not return nil after checking `err != nil` | Likely a logic bug | `nilerr` |
-| Close HTTP response bodies | Prevents resource leaks | `bodyclose` |
-
-#### 1.9 Complexity Limits
-
-| Metric | Threshold | Enforced By |
-|--------|-----------|-------------|
-| Cognitive complexity | ≤ 30 | `gocognit` |
-| Cyclomatic complexity | ≤ 15 | `cyclop` |
-| Nested if depth | ≤ 5 | `nestif` |
-
-#### 1.10 Interface Design
-
-Interfaces should follow the **small interface principle**. A single interface must not exceed **10 methods**.
-
-**Enforced by:** `interfacebloat`
-
-#### 1.11 Code Style
-
-| Rule | Description | Enforced By |
-|------|-------------|-------------|
-| No empty blocks | All blocks must contain at least a comment | `revive (empty-block)` |
-| Prefer early return | Avoid deep nesting with `else` | `revive (superfluous-else, early-return)` |
-| `context.Context` must be the first parameter | Standard Go convention | `revive (context-as-argument)` |
-| Switch on enums must be exhaustive | All cases must be handled | `exhaustive` |
-| No unnecessary parentheses or statements | Keep code clean | `gocritic` |
-| `nolint` directives require explanation | Must specify which linter and why | `nolintlint` |
-
-### 2. Tests
-
-All tests must pass:
+### Tests
 
 ```bash
 go test ./... -race -count=1
 ```
 
-- Tests should use `t.Helper()` in helper functions.
-- Tests should use `t.Parallel()` where safe.
-
-**Enforced by:** `thelper`, `tparallel`
-
-### 3. Suppressing Rules
-
-If a rule must be suppressed, use a `//nolint` directive with:
-1. The **specific linter name** being suppressed
-2. A **reason** explaining why
+### Suppressing Rules
 
 ```go
 //nolint:lll // This line contains a long regex pattern that cannot be split.
 var pattern = regexp.MustCompile(`...very long pattern...`)
 ```
 
-Blanket `//nolint` without a linter name or explanation will be rejected.
-
 ---
 
 ## CI / Merge Requirements
 
-Pull requests to the `main` branch must pass **all** of the following checks before merging:
+| Check | Command | Required |
+|-------|---------|----------|
+| **Lint** | `golangci-lint run ./...` | ✅ |
+| **Tests** | `go test ./... -race -count=1` | ✅ |
+| **Review** | 1 approving review | ✅ |
 
-| Check | Command | Must Pass |
-|-------|---------|-----------|
-| **Lint** | `golangci-lint run ./...` | ✅ Required |
-| **Tests** | `go test ./... -race -count=1` | ✅ Required |
-
-> **Merging is blocked** if any check fails. There are no exceptions or override capabilities for non-admin users.
+> **Merging is blocked** if any check fails.
 
 ---
 
-## Development Setup
+## Contributing
 
-### Prerequisites
+We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a pull request.
 
-- **Go** 1.26.5 or later
-- **golangci-lint** v2.x ([installation guide](https://golangci-lint.run/welcome/install/))
+- [Bug Report](https://github.com/gardenoftheazazil/daemonproc/issues/new?template=bug_report.yml)
+- [Feature Request](https://github.com/gardenoftheazazil/daemonproc/issues/new?template=feature_request.yml)
 
-### Running Locally
+## Security
 
-```bash
-# Run linter
-golangci-lint run ./...
+For security vulnerabilities, please see our [Security Policy](SECURITY.md).
+**Do NOT report security issues through public GitHub issues.**
 
-# Run tests
-go test ./... -race -count=1
-```
+## Code of Conduct
+
+This project follows the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
+
+## License
+
+This project is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+See [LICENSE](license.md) for the full text.
