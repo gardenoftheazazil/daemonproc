@@ -357,14 +357,6 @@ linters-settings:
     disabled-checks:
       - whyNoLint               # nolintlint already handles this.
       - hugeParam               # Large parameters are sometimes unavoidable.
-
-  # -------------------------------------------------------------------------
-  # Error Naming
-  # Checkstyle Equivalent: TypeName (specific format for error types)
-  # -------------------------------------------------------------------------
-  errname:
-    with-suffix: Error          # Error types must end with XxxError.
-
   # -------------------------------------------------------------------------
   # Switch-Case Exhaustiveness Check
   # Checkstyle Equivalent: MissingSwitchDefault
