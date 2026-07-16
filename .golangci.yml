@@ -1,493 +1,254 @@
-# ===========================================================================
-# golangci-lint Configuration — Garden of the Azazil
-# ---------------------------------------------------------------------------
-# This configuration is the Go equivalent of the project's Java Checkstyle
-# rules. Each linter and rule block is annotated with the corresponding
-# Checkstyle module it maps to. It is not an exact copy; it has been
-# adapted to Go ecosystem idioms and tooling.
-# ===========================================================================
-
+version: "2"
 run:
-  timeout: 5m
   issues-exit-code: 1
   tests: true
-
-# ===========================================================================
-# Linter Selection
-# ===========================================================================
-linters:
-  disable-all: true
-  enable:
-    # --- Core (Default) Go Linters ---
-    - errcheck          # Enforces that error returns are checked.
-    - gosimple          # Detects code patterns that can be simplified.
-    - govet             # Go vet — the official static analysis tool.
-    - ineffassign       # Detects unused assignments.
-    - staticcheck       # Go's most comprehensive static analysis tool.
-    - unused            # Detects unused variables, functions, and types.
-
-    # --- Comments & Documentation ---
-    # Checkstyle: MissingJavadocMethod, MissingJavadocType, JavadocMethod,
-    #             JavadocType, JavadocVariable, SummaryJavadoc, SingleLineJavadoc,
-    #             NonEmptyAtclauseDescription, JavadocContentLocation,
-    #             JavadocLeadingAsteriskAlign, JavadocMissingWhitespaceAfterAsterisk
-    - goheader          # File header/license check (Checkstyle: Header).
-    - godot             # Checks that comments end with a period (Go convention).
-    - revive            # Requires comments on exported definitions (Checkstyle: MissingJavadoc*).
-    - stylecheck        # Go style rules (ST1000 package comment, ST1020 exported comment, etc.).
-
-    # --- Naming Conventions ---
-    # Checkstyle: CatchParameterName, LocalVariableName, MethodName, PackageName,
-    #             ParameterName, StaticVariableName, TypeName, MemberName, ConstantName
-    # In Go, naming is enforced by revive + stylecheck.
-    # Additionally, predeclared detects shadowing of built-in identifiers.
-    - predeclared       # Prevents shadowing of predeclared Go identifiers (len, cap, etc.).
-
-    # --- Import Rules ---
-    # Checkstyle: AvoidStarImport, IllegalImport, RedundantImport, UnusedImports
-    - goimports         # Import ordering and formatting (gofmt + import layout).
-    - gci               # Import grouping order (stdlib -> external deps -> project).
-
-    # --- Whitespace, Formatting & Line Length ---
-    # Checkstyle: LineLength, FileTabCharacter, WhitespaceAfter, WhitespaceAround,
-    #             GenericWhitespace, Indentation, EmptyForInitializerPad,
-    #             MethodParamPad, ParenPad, TypecastParenPad, OperatorWrap
-    - lll               # Line length check (Checkstyle: LineLength max=120).
-    - whitespace        # Unnecessary blank line checks (function start/end).
-    - gofmt             # Go standard formatting (includes tab usage).
-
-    # --- Block & Brace Rules ---
-    # Checkstyle: LeftCurly, RightCurly, NeedBraces, AvoidNestedBlocks, EmptyBlock
-    # In Go, brace style is enforced by the language itself (eol style).
-    # revive's "empty-block" rule corresponds to Checkstyle's EmptyBlock.
-
-    # --- Coding Problems ---
-    # Checkstyle: EmptyStatement, EqualsHashCode, HiddenField, InnerAssignment,
-    #             MissingSwitchDefault, SimplifyBooleanReturn, SimplifyBooleanExpression,
-    #             UnnecessaryParentheses, UnnecessarySemicolon*, EqualsAvoidNull,
-    #             MultipleVariableDeclarations
-    - gocritic          # Comprehensive code quality checks (unnecessary parens, simplification, etc.).
-    - exhaustive        # Switch-case exhaustiveness check (Checkstyle: MissingSwitchDefault).
-    - dupword           # Detects duplicated words in comments and strings.
-    - usestdlibvars     # Enforces the use of standard library constants.
-    - nolintlint        # Requires that nolint directives include an explanation.
-    - copyloopvar       # Detects loop variable copy issues.
-    - intrange          # Enforces idiomatic integer range loop usage.
-
-    # --- Class Design (Go Equivalents) ---
-    # Checkstyle: FinalClass, HideUtilityClassConstructor, InterfaceIsType,
-    #             VisibilityModifier, FinalLocalVariable
-    - interfacebloat    # Detects overly large interfaces (Go: small interface principle).
-
-    # --- Regex & Custom Pattern Checks ---
-    # Checkstyle: RegexpSingleline (System.out.println, serialVersionUID, etc.),
-    #             RegexpMultiline (consecutive blank lines, package declaration spacing)
-    - forbidigo         # Forbidden function calls (Checkstyle: System.out.println equivalent).
-
-    # --- Performance & Safety ---
-    - bodyclose         # Checks that HTTP response bodies are closed.
-    - durationcheck     # Detects time.Duration multiplication errors.
-    - nilerr            # Detects returning nil after a nil error check.
-    - errname           # Naming conventions for error types (XxxError format).
-    - errorlint         # Error wrapping and comparison best practices.
-    - makezero          # Suggests make(slice, 0, cap) instead of make(slice, len) for append.
-    - reassign          # Checks for reassignment of package-level variables.
-    - wastedassign      # Extended unused assignment detection (beyond ineffassign).
-
-    # --- Complexity ---
-    # Checkstyle doesn't directly measure complexity, but it's an important metric in Go.
-    - gocognit          # Cognitive complexity score.
-    - cyclop            # Cyclomatic complexity.
-    - nestif            # Nested if depth check.
-
-    # --- Test Quality ---
-    - tparallel         # Test parallelization checks.
-    - thelper           # Checks for t.Helper() calls in test helper functions.
-
-# ===========================================================================
-# Linter Settings
-# ===========================================================================
-linters-settings:
-
-  # -------------------------------------------------------------------------
-  # File Header / License Check
-  # Checkstyle Equivalent: Header module
-  # -------------------------------------------------------------------------
-  goheader:
-    values:
-      const:
-        author: "Garden of the Azazil"
-      regexp:
-        year: "202[0-9]"
-    template: |-
-      Copyright (c) {{year}} {{author}}. All rights reserved.
-      Licensed under the AGPL-3.0 License.
-      See LICENSE file in the project root for full license information.
-
-  # -------------------------------------------------------------------------
-  # Comment Rules
-  # Checkstyle Equivalent: SummaryJavadoc, SingleLineJavadoc,
-  #                         JavadocContentLocation, NonEmptyAtclauseDescription
-  # -------------------------------------------------------------------------
-  godot:
-    # Checks that all comments end with a period.
-    scope: all
-    exclude:
-      - "^TODO"
-      - "^FIXME"
-      - "^HACK"
-      - "^NOTE"
-      - "^BUG"
-      - "^XXX"
-      - "^nolint"
-
-  # -------------------------------------------------------------------------
-  # Exported Definition Comment Requirements & General Style Rules
-  # Checkstyle Equivalent: MissingJavadocMethod, MissingJavadocType,
-  #                         MissingJavadocPackage, JavadocMethod, JavadocType,
-  #                         JavadocVariable, EmptyBlock, SimplifyBooleanReturn,
-  #                         EqualsHashCode, HiddenField, ModifierOrder,
-  #                         MultipleVariableDeclarations, OneStatementPerLine,
-  #                         NeedBraces, FinalLocalVariable (override check)
-  # -------------------------------------------------------------------------
-  revive:
-    enable-all-rules: false
-    rules:
-      # --- Comment Rules (Javadoc equivalents) ---
-      - name: exported
-        severity: warning
-        arguments:
-          - "checkPrivateReceivers"    # Also check private receiver methods.
-          - "disableStutteringCheck"   # Ignore package name repetition.
-
-      - name: package-comments
-        severity: warning
-
-      # --- Empty Block Check (Checkstyle: EmptyBlock) ---
-      - name: empty-block
-        severity: warning
-
-      # --- Boolean Simplification (Checkstyle: SimplifyBooleanReturn) ---
-      - name: bool-literal-in-expr
-        severity: warning
-
-      # --- Unnecessary return (Checkstyle: general code quality) ---
-      - name: unnecessary-stmt
-        severity: warning
-
-      # --- Single Statement Per Line (Checkstyle: OneStatementPerLine) ---
-      - name: empty-lines
-        severity: warning
-
-      # --- Error String Constants (Go convention: must start lowercase) ---
-      - name: error-strings
-        severity: warning
-
-      # --- Naming (Checkstyle: CatchParameterName, MethodName, etc.) ---
-      - name: var-naming
-        severity: warning
-
-      # --- Receiver Naming Consistency ---
-      - name: receiver-naming
-        severity: warning
-
-      # --- Context Parameter Must Be First (Go convention) ---
-      - name: context-as-argument
-        severity: warning
-
-      # --- Unused Parameters (Checkstyle: general quality) ---
-      - name: unused-parameter
-        severity: warning
-
-      # --- Superfluous else (Go idiom: early return) ---
-      - name: superfluous-else
-        severity: warning
-        arguments:
-          - "preserveScope"
-
-      # --- Unconditional return (unreachable code) ---
-      - name: unreachable-code
-        severity: warning
-
-      # --- Identical branches in adjacent if ---
-      - name: identical-branches
-        severity: error
-
-      # --- Import alias naming ---
-      - name: import-alias-naming
-        severity: warning
-        arguments:
-          - "^[a-z][a-z0-9]*$"
-
-      # --- Early return (Go idiom) ---
-      - name: early-return
-        severity: warning
-        arguments:
-          - "preserveScope"
-
-      # --- Defer usage ---
-      - name: defer
-        severity: warning
-        arguments:
-          - ["call-chain", "loop"]
-
-      # --- String formatting (Checkstyle: general quality) ---
-      - name: string-format
-        severity: warning
-
-      # --- Assignment in condition (Checkstyle: InnerAssignment) ---
-      - name: modifies-value-receiver
-        severity: warning
-
-      # --- Constant style check (Checkstyle: AnnotationUseStyle) ---
-      - name: constant-logical-expr
-        severity: warning
-
-  # -------------------------------------------------------------------------
-  # Go Style Checks
-  # Checkstyle Equivalent: JavadocPackage, TypeName, AnnotationUseStyle,
-  #                         ModifierOrder, RedundantModifier
-  # -------------------------------------------------------------------------
-  stylecheck:
-    checks: ["all"]
-    # ST1000: Package comment check (Checkstyle: JavadocPackage/MissingJavadocPackage).
-    # ST1003: Naming conventions (Checkstyle: TypeName, MethodName, etc.).
-    # ST1005: Error strings must start with lowercase.
-    # ST1006: Receiver naming.
-    # ST1008: Error must be the last return parameter.
-    # ST1012: Error variables should be named errXxx.
-    # ST1013: HTTP status codes should use constants.
-    # ST1015: Switch default case check.
-    # ST1016: Receiver names must be consistent.
-    # ST1017: Avoid Yoda conditions.
-    # ST1018: Zero-width character check in strings.
-    # ST1019: Duplicate import check (Checkstyle: RedundantImport).
-    # ST1020-1023: Exported comment rules.
-
-  # -------------------------------------------------------------------------
-  # Line Length
-  # Checkstyle Equivalent: LineLength (max=120)
-  # -------------------------------------------------------------------------
-  lll:
-    line-length: 120
-    tab-width: 4
-
-  # -------------------------------------------------------------------------
-  # Import Ordering
-  # Checkstyle Equivalent: AvoidStarImport (Go has no star imports),
-  #                         import ordering
-  # -------------------------------------------------------------------------
-  gci:
-    sections:
-      - standard                                    # Go standard library.
-      - default                                     # Third-party dependencies.
-      - prefix(github.com/gardenoftheazazil)        # Project-internal packages.
-    custom-order: true
-
-  goimports:
-    local-prefixes: github.com/gardenoftheazazil
-
-  # -------------------------------------------------------------------------
-  # Forbidden Functions
-  # Checkstyle Equivalent: RegexpSingleline/RegexpMultiline
-  #   - System.out.println -> fmt.Println (forbidden in production code)
-  #   - serialVersionUID -> No Go equivalent, but similar anti-patterns
-  # -------------------------------------------------------------------------
-  forbidigo:
-    forbid:
-      # Checkstyle: System.out.println/System.err.println equivalent
-      - p: "^fmt\\.Print(ln|f)?$"
-        msg: >-
-          Do not use fmt.Print/Println/Printf in production code.
-          Use a structured logger (slog, zerolog, zap) instead.
-
-      # Checkstyle: System.out equivalent — direct os.Stdout/Stderr writes
-      - p: "^os\\.Stdout"
-        msg: >-
-          Do not write directly to os.Stdout in production code.
-          Use a structured logger instead.
-
-      - p: "^os\\.Stderr"
-        msg: >-
-          Do not write directly to os.Stderr in production code.
-          Use a structured logger instead.
-
-      # Restrict panic() usage (return errors instead)
-      - p: "^panic$"
-        msg: >-
-          Prefer returning an error instead of panic().
-          Only use panic for truly unrecoverable situations.
-
-    exclude-godoc-examples: true
-    analyze-types: true
-
-  # -------------------------------------------------------------------------
-  # Code Complexity Checks
-  # No direct Checkstyle equivalent, but a Go best practice.
-  # -------------------------------------------------------------------------
-  gocognit:
-    min-complexity: 30          # Cognitive complexity threshold.
-
-  cyclop:
-    max-complexity: 15          # Cyclomatic complexity threshold.
-    skip-tests: true
-
-  nestif:
-    min-complexity: 5           # Nested if depth threshold.
-
-  # -------------------------------------------------------------------------
-  # Function Body Blank Line Checks
-  # Checkstyle Equivalent: RegexpMultiline (consecutive blank line check)
-  # -------------------------------------------------------------------------
-  whitespace:
-    multi-if: true              # Blank line check in multi-line if statements.
-    multi-func: true            # Blank line check in multi-line function definitions.
-
-  # -------------------------------------------------------------------------
-  # Comprehensive Code Quality (gocritic)
-  # Checkstyle Equivalent: UnnecessaryParentheses, SimplifyBooleanExpression,
-  #                         EmptyStatement, EqualsAvoidNull, InnerAssignment
-  # -------------------------------------------------------------------------
-  gocritic:
-    enabled-tags:
-      - diagnostic              # Bug detection (nil dereference, misuse, etc.).
-      - style                   # Style improvements (unnecessary parens, simplification).
-      - performance             # Performance suggestions (unnecessary alloc, copying).
-      - opinionated             # Strong style preferences.
-    disabled-checks:
-      - whyNoLint               # nolintlint already handles this.
-      - hugeParam               # Large parameters are sometimes unavoidable.
-  # -------------------------------------------------------------------------
-  # Switch-Case Exhaustiveness Check
-  # Checkstyle Equivalent: MissingSwitchDefault
-  # When using enums (iota) in Go, ensures all cases are covered.
-  # -------------------------------------------------------------------------
-  exhaustive:
-    check-generated: false
-    default-signifies-exhaustive: true
-
-  # -------------------------------------------------------------------------
-  # Interface Size Check
-  # Checkstyle Equivalent: InterfaceIsType (Go: small interface principle)
-  # -------------------------------------------------------------------------
-  interfacebloat:
-    max: 10                     # An interface should have at most 10 methods.
-
-  # -------------------------------------------------------------------------
-  # nolint Directive Check
-  # Checkstyle Equivalent: SuppressionFilter (requires justification when
-  #                         using suppress rules)
-  # -------------------------------------------------------------------------
-  nolintlint:
-    require-explanation: true   # nolint directives must include an explanation.
-    require-specific: true      # nolint must specify a specific linter name.
-
-  # -------------------------------------------------------------------------
-  # Error Wrapping
-  # Go-specific — no Checkstyle equivalent.
-  # -------------------------------------------------------------------------
-  errorlint:
-    errorf: true                # Checks %w usage in fmt.Errorf.
-    errorf-multi: true          # Multi-error wrapping check.
-    asserts: true               # Checks errors.As/Is usage.
-    comparison: true            # Enforces errors.Is() instead of ==.
-
-  # -------------------------------------------------------------------------
-  # Go Vet Additional Checks
-  # Checkstyle Equivalent: Various coding error checks
-  # -------------------------------------------------------------------------
-  govet:
-    enable-all: true
-    disable:
-      - fieldalignment          # Struct field ordering — performance vs readability trade-off.
-
-# ===========================================================================
-# Issue Settings
-# ===========================================================================
-issues:
-  # Maximum number of issues to show per linter (0 = unlimited).
-  max-issues-per-linter: 0
-  max-same-issues: 0
-
-  # Exclude specific paths and conditions.
-  exclude-rules:
-    # --- Test File Relaxations ---
-    # Checkstyle: BeforeExecutionExclusionFileFilter (excludes test files)
-    - path: "_test\\.go$"
-      linters:
-        - goheader              # License header is optional in test files.
-        - lll                   # Test assertions may contain long lines.
-        - gocritic              # More flexible style in test code.
-        - gocognit              # Test functions can be complex.
-        - cyclop                # Complexity threshold not applied in tests.
-        - nestif                # Nested ifs are normal in tests.
-        - forbidigo             # fmt.Println is acceptable in tests.
-        - errcheck              # Some errors can be ignored in tests.
-        - revive                # Comment requirements relaxed for test helpers.
-
-    # --- Generated File Relaxations ---
-    - path: "generated"
-      linters:
-        - goheader
-        - lll
-        - revive
-        - stylecheck
-        - gocritic
-
-    # --- Allow fmt.Println in main.go ---
-    - path: "main\\.go$"
-      linters:
-        - forbidigo
-
-    # --- Only package comment expected in doc.go ---
-    - path: "doc\\.go$"
-      linters:
-        - lll
-
-  # Do not use Go's default exclusions — manually control everything.
-  exclude-use-default: false
-
-  # Checkstyle: RegexpMultiline (consecutive blank lines) — Go formatter handles this.
-  # Checkstyle: FileTabCharacter — Go uses tabs by standard (gofmt).
-  # Checkstyle: NewlineAtEndOfFile — gofmt already adds newline at end of file.
-
-# ===========================================================================
-# Output Settings
-# ===========================================================================
 output:
   formats:
-    - format: colored-line-number
-  print-linter-name: true
-  print-issued-lines: true
-
-# ===========================================================================
-# Severity Settings
-# ===========================================================================
+    text:
+      path: stdout
+      print-linter-name: true
+      print-issued-lines: true
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - cyclop
+    - dupword
+    - durationcheck
+    - errcheck
+    - errname
+    - errorlint
+    - exhaustive
+    - forbidigo
+    - gocognit
+    - gocritic
+    - godot
+    - goheader
+    - govet
+    - ineffassign
+    - interfacebloat
+    - intrange
+    - lll
+    - makezero
+    - nestif
+    - nilerr
+    - nolintlint
+    - predeclared
+    - reassign
+    - revive
+    - staticcheck
+    - thelper
+    - tparallel
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
+  settings:
+    cyclop:
+      max-complexity: 15
+    errorlint:
+      errorf: true
+      errorf-multi: true
+      asserts: true
+      comparison: true
+    exhaustive:
+      default-signifies-exhaustive: true
+    forbidigo:
+      forbid:
+        - pattern: ^fmt\.Print(ln|f)?$
+          msg: Do not use fmt.Print/Println/Printf in production code. Use a structured logger (slog, zerolog, zap) instead.
+        - pattern: ^os\.Stdout
+          msg: Do not write directly to os.Stdout in production code. Use a structured logger instead.
+        - pattern: ^os\.Stderr
+          msg: Do not write directly to os.Stderr in production code. Use a structured logger instead.
+        - pattern: ^panic$
+          msg: Prefer returning an error instead of panic(). Only use panic for truly unrecoverable situations.
+      exclude-godoc-examples: true
+      analyze-types: true
+    gocognit:
+      min-complexity: 30
+    gocritic:
+      disabled-checks:
+        - whyNoLint
+        - hugeParam
+      enabled-tags:
+        - diagnostic
+        - style
+        - performance
+        - opinionated
+    godot:
+      scope: all
+      exclude:
+        - ^TODO
+        - ^FIXME
+        - ^HACK
+        - ^NOTE
+        - ^BUG
+        - ^XXX
+        - ^nolint
+    goheader:
+      values:
+        const:
+          author: Garden of the Azazil
+        regexp:
+          year: 202[0-9]
+      template: |-
+        Copyright (c) {{year}} {{author}}. All rights reserved.
+        Licensed under the AGPL-3.0 License.
+        See LICENSE file in the project root for full license information.
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+    interfacebloat:
+      max: 10
+    lll:
+      line-length: 120
+      tab-width: 4
+    nestif:
+      min-complexity: 5
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+    revive:
+      enable-all-rules: false
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - disableStutteringCheck
+          severity: warning
+        - name: package-comments
+          severity: warning
+        - name: empty-block
+          severity: warning
+        - name: bool-literal-in-expr
+          severity: warning
+        - name: unnecessary-stmt
+          severity: warning
+        - name: empty-lines
+          severity: warning
+        - name: error-strings
+          severity: warning
+        - name: var-naming
+          severity: warning
+        - name: receiver-naming
+          severity: warning
+        - name: context-as-argument
+          severity: warning
+        - name: unused-parameter
+          severity: warning
+        - name: superfluous-else
+          arguments:
+            - preserveScope
+          severity: warning
+        - name: unreachable-code
+          severity: warning
+        - name: identical-branches
+          severity: error
+        - name: import-alias-naming
+          arguments:
+            - ^[a-z][a-z0-9]*$
+          severity: warning
+        - name: early-return
+          arguments:
+            - preserveScope
+          severity: warning
+        - name: defer
+          arguments:
+            - - call-chain
+              - loop
+          severity: warning
+        - name: string-format
+          severity: warning
+        - name: modifies-value-receiver
+          severity: warning
+        - name: constant-logical-expr
+          severity: warning
+    staticcheck:
+      checks:
+        - all
+    whitespace:
+      multi-if: true
+      multi-func: true
+  exclusions:
+    generated: lax
+    rules:
+      - linters:
+          - cyclop
+          - errcheck
+          - forbidigo
+          - gocognit
+          - gocritic
+          - goheader
+          - lll
+          - nestif
+          - revive
+        path: _test\.go$
+      - linters:
+          - gocritic
+          - goheader
+          - lll
+          - revive
+          - staticcheck
+        path: generated
+      - linters:
+          - forbidigo
+        path: main\.go$
+      - linters:
+          - lll
+        path: doc\.go$
+      - linters:
+          - cyclop
+        path: (.+)_test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
 severity:
-  default-severity: warning
-  case-sensitive: false
+  default: warning
   rules:
-    # Critical errors — should break the build.
     - linters:
-        - govet
-        - errcheck
-        - staticcheck
         - bodyclose
+        - errcheck
+        - govet
         - nilerr
+        - staticcheck
       severity: error
-
-    # Style warnings — should be fixed but not urgent.
     - linters:
-        - revive
-        - stylecheck
         - godot
         - lll
+        - revive
+        - staticcheck
       severity: warning
-
-    # Informational — improvement suggestions.
     - linters:
-        - gocritic
-        - gocognit
         - cyclop
+        - gocognit
+        - gocritic
         - nestif
       severity: info
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - goimports
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/gardenoftheazazil)
+      custom-order: true
+    goimports:
+      local-prefixes:
+        - github.com/gardenoftheazazil
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
