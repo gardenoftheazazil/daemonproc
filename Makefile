@@ -4,7 +4,8 @@
 
 # Go parameters
 GOCMD      := go
-GOTEST     := $(GOCMD) test
+GOTMPDIR   := $(shell pwd)/bin/tmp
+GOTEST     := GOTMPDIR=$(GOTMPDIR) $(GOCMD) test
 GOBUILD    := $(GOCMD) build
 GOVET      := $(GOCMD) vet
 GOFMT      := gofmt
@@ -48,18 +49,21 @@ vet: ## Run go vet on all packages.
 .PHONY: test
 test: ## Run all tests with race detector.
 	@echo ">>> Testing..."
+	@mkdir -p $(GOTMPDIR)
 	@$(GOTEST) ./... $(TEST_FLAGS)
 	@echo "✓ Done"
 
 .PHONY: test-short
 test-short: ## Run tests in short mode (skip long-running tests).
 	@echo ">>> Testing (short)..."
+	@mkdir -p $(GOTMPDIR)
 	@$(GOTEST) ./... -short $(TEST_FLAGS)
 	@echo "✓ Done"
 
 .PHONY: cover
 cover: ## Run tests with coverage report.
 	@echo ">>> Coverage..."
+	@mkdir -p $(GOTMPDIR)
 	@$(GOTEST) ./... -coverprofile=$(COVER_FILE) -covermode=atomic $(TEST_FLAGS)
 	@$(GOCMD) tool cover -html=$(COVER_FILE) -o coverage.html
 	@echo "✓ Coverage report: coverage.html"
