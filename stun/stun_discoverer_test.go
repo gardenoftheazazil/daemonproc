@@ -212,8 +212,7 @@ func TestDiscovererLoopSuccess(t *testing.T) {
 	// Setup Discoverer.
 	disc := NewDiscoverer(mockListener, []string{"127.0.0.1:19302"}, id, 100*time.Millisecond)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err = disc.Start(ctx)
 	if err != nil {

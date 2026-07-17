@@ -4,12 +4,10 @@
 
 package interfaces
 
-import "net"
-
-// IEgress represents the interface for sending data to a target address using a specified session.
+// IEgress represents the interface for sending local application data to the P2P network.
 type IEgress interface {
-	// Send data to the specified target address using the provided session information.
-	// The session information is used to encrypt the data before sending it.
-	// Returns an error if the send operation fails.
-	Send(targetAddr *net.UDPAddr, portListener IUdpPortListener, session HandshakeSession, data []byte) error
+	// RouteToNetwork routes local application payloads to the network.
+	// Egress is responsible for parsing routing headers (remote peer, remote DID),
+	// encrypting the payload, and sending it to the correct destination.
+	RouteToNetwork(srcDID DID, data []byte) error
 }

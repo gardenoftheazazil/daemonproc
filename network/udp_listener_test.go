@@ -5,7 +5,6 @@
 package network
 
 import (
-	"context"
 	"net"
 	"testing"
 	"time"
@@ -13,8 +12,7 @@ import (
 
 func TestUDPListenerStartStop(t *testing.T) {
 	l := NewUDPListener()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	// Start listener on a random port (port 0 lets the OS pick a free port).
 	err := l.StartListener(ctx, 0)
@@ -52,8 +50,7 @@ func TestUDPListenerStartStop(t *testing.T) {
 
 func TestUDPListenerSendReceive(t *testing.T) {
 	l := NewUDPListener()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err := l.StartListener(ctx, 0)
 	if err != nil {
@@ -155,8 +152,7 @@ func TestUDPListenerSendReceive(t *testing.T) {
 
 func TestUDPListenerDropOnBlock(t *testing.T) {
 	l := NewUDPListener()
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	err := l.StartListener(ctx, 0)
 	if err != nil {
