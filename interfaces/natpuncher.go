@@ -43,6 +43,7 @@ type INatPuncher interface {
 	StartPunch(
 		ctx context.Context,
 		udpPortListener IUdpPortListener,
+		targetAddr *net.UDPAddr,
 		inviteKey string,
 		subscriber INatPunchSubscriber,
 	) error

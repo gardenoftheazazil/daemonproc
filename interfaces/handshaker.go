@@ -40,6 +40,7 @@ type IHandshaker interface {
 	StartHandshake(
 		ctx context.Context,
 		udpPortListener IUdpPortListener,
+		targetAddr *net.UDPAddr,
 		inviteKey string,
 		subscriber IHandshakerSubscriber,
 	) error
