@@ -13,7 +13,7 @@ import (
 // sending UDP packets to a specific IP address and port.
 type IUdpPortListener interface {
 	// StartListener starts listening on the specified UDP port.
-	StartListener(port uint16, ctx context.Context) error
+	StartListener(ctx context.Context, port uint16) error
 
 	// StopListener stops listening on the UDP port.
 	StopListener() error
