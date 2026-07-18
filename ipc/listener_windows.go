@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/Microsoft/go-winio"
+
 	"github.com/gardenoftheazazil/daemonproc/interfaces"
 )
 

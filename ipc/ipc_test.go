@@ -249,7 +249,10 @@ func TestSessionManager(t *testing.T) {
 		if cbDID == did {
 			receivedControlPayload = payload
 			// Write response back to local application.
-			_ = sm.SendControlToLocal(cbDID, []byte("control-response"))
+			// Run in a goroutine to avoid blocking the read loop, preventing a deadlock on Windows named pipes.
+			go func() {
+				_ = sm.SendControlToLocal(cbDID, []byte("control-response"))
+			}()
 			controlWG.Done()
 		}
 	})
