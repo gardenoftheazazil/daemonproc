@@ -5,7 +5,6 @@
 package controlcenter_test
 
 import (
-	"context"
 	"crypto/sha512"
 	"encoding/binary"
 	"net"
@@ -109,8 +108,7 @@ func TestIPC_ControlCenter_HeavyWorkload_Stress(t *testing.T) {
 	dispatcher, _ := setupIntegrationEnvironment(t)
 	counter := registerHeavyTestSyscalls(t, dispatcher)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	sessionManager := ipc.NewSessionManager(ctx, &mockEgress{})
 	defer func() {

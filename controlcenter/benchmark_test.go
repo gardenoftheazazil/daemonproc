@@ -5,7 +5,6 @@
 package controlcenter_test
 
 import (
-	"context"
 	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -94,8 +93,7 @@ func BenchmarkIPC_ControlCenter_EndToEnd(b *testing.B) {
 		},
 	})
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 
 	sessionManager := ipc.NewSessionManager(ctx, &mockEgress{})
 	defer func() {
@@ -141,8 +139,7 @@ func BenchmarkIPC_ControlCenter_HeavyWorkload(b *testing.B) {
 	dispatcher, _ := setupIntegrationEnvironment(b)
 	_ = registerHeavyTestSyscalls(b, dispatcher)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := b.Context()
 
 	sessionManager := ipc.NewSessionManager(ctx, &mockEgress{})
 	defer func() {

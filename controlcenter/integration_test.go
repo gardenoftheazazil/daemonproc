@@ -6,7 +6,6 @@ package controlcenter_test
 
 import (
 	"bytes"
-	"context"
 	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -92,8 +91,7 @@ func TestIPC_ControlCenter_MultiAppIntegration(t *testing.T) {
 
 	dispatcher, _ := setupIntegrationEnvironment(t)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	sessionManager := ipc.NewSessionManager(ctx, &mockEgress{})
 	defer func() {
