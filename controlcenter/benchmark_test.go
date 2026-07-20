@@ -8,7 +8,6 @@ import (
 	"crypto/ecdh"
 	"crypto/ed25519"
 	"crypto/rand"
-	"encoding/binary"
 	"net"
 	"testing"
 	"time"
@@ -31,9 +30,7 @@ func BenchmarkDispatcher_DispatchSysCall(b *testing.B) {
 		},
 	})
 
-	reqPayload := make([]byte, 34)
-	binary.BigEndian.PutUint16(reqPayload[0:2], opcode)
-	copy(reqPayload[2:], []byte("01234567890123456789012345678901"))
+	reqPayload := []byte("01234567890123456789012345678901")
 
 	b.ResetTimer()
 	b.ReportAllocs()
@@ -41,7 +38,7 @@ func BenchmarkDispatcher_DispatchSysCall(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		var didCounter interfaces.DID = 1
 		for pb.Next() {
-			res := dispatcher.DispatchSysCall(didCounter, reqPayload)
+			res := dispatcher.DispatchSysCall(didCounter, opcode, reqPayload)
 			if res.StatusCode != controlcenter.Success {
 				b.Fatalf("unexpected status: %d", res.StatusCode)
 			}
@@ -64,16 +61,13 @@ func BenchmarkDispatcher_GetInviteKey(b *testing.B) {
 		Handler: controlcenter.MakeGetInviteKeyHandler(km),
 	})
 
-	reqPayload := make([]byte, 2)
-	binary.BigEndian.PutUint16(reqPayload[0:2], controlcenter.OpcodeGetInviteKey)
-
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	b.RunParallel(func(pb *testing.PB) {
 		var didCounter interfaces.DID = 100
 		for pb.Next() {
-			res := dispatcher.DispatchSysCall(didCounter, reqPayload)
+			res := dispatcher.DispatchSysCall(didCounter, controlcenter.OpcodeGetInviteKey, nil)
 			if res.StatusCode != controlcenter.Success {
 				b.Fatalf("unexpected status: %d", res.StatusCode)
 			}
@@ -100,9 +94,9 @@ func BenchmarkIPC_ControlCenter_EndToEnd(b *testing.B) {
 		_ = sessionManager.Close()
 	}()
 
-	sessionManager.SetControlCallback(func(did interfaces.DID, payload []byte) {
-		res := dispatcher.DispatchSysCall(did, payload)
-		_ = sessionManager.SendControlToLocal(did, res.Encode())
+	sessionManager.SetControlCallback(func(did interfaces.DID, opcode uint16, payload []byte) {
+		res := dispatcher.DispatchSysCall(did, opcode, payload)
+		_ = sessionManager.SendToLocal(did, res.Opcode, res.StatusCode, res.Payload)
 	})
 
 	serverConn, clientConn := net.Pipe()
@@ -114,15 +108,14 @@ func BenchmarkIPC_ControlCenter_EndToEnd(b *testing.B) {
 		b.Fatalf("failed to register session: %v", err)
 	}
 
-	reqPayload := make([]byte, 10)
-	binary.BigEndian.PutUint16(reqPayload[0:2], opcode)
+	reqPayload := []byte("hello-echo")
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for b.Loop() {
 		_ = clientConn.SetDeadline(time.Now().Add(2 * time.Second))
-		if errWrite := writeIPCControlPacket(clientConn, reqPayload); errWrite != nil {
+		if errWrite := writeIPCControlPacket(clientConn, opcode, reqPayload); errWrite != nil {
 			b.Fatalf("write failed: %v", errWrite)
 		}
 		_, status, _, errRead := readIPCControlPacket(clientConn)
@@ -146,9 +139,9 @@ func BenchmarkIPC_ControlCenter_HeavyWorkload(b *testing.B) {
 		_ = sessionManager.Close()
 	}()
 
-	sessionManager.SetControlCallback(func(did interfaces.DID, payload []byte) {
-		res := dispatcher.DispatchSysCall(did, payload)
-		_ = sessionManager.SendControlToLocal(did, res.Encode())
+	sessionManager.SetControlCallback(func(did interfaces.DID, opcode uint16, payload []byte) {
+		res := dispatcher.DispatchSysCall(did, opcode, payload)
+		_ = sessionManager.SendToLocal(did, res.Opcode, res.StatusCode, res.Payload)
 	})
 
 	serverConn, clientConn := net.Pipe()
@@ -160,15 +153,12 @@ func BenchmarkIPC_ControlCenter_HeavyWorkload(b *testing.B) {
 		b.Fatalf("failed to register session: %v", errReg)
 	}
 
-	reqPayload := make([]byte, 2)
-	binary.BigEndian.PutUint16(reqPayload[0:2], OpcodeHeavyCrypto)
-
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for b.Loop() {
 		_ = clientConn.SetDeadline(time.Now().Add(5 * time.Second))
-		if errWrite := writeIPCControlPacket(clientConn, reqPayload); errWrite != nil {
+		if errWrite := writeIPCControlPacket(clientConn, OpcodeHeavyCrypto, nil); errWrite != nil {
 			b.Fatalf("write failed: %v", errWrite)
 		}
 		_, status, _, errRead := readIPCControlPacket(clientConn)

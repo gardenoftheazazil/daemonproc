@@ -112,21 +112,9 @@ func (d *Dispatcher) RegisterSysCall(opcode uint16, descriptor SyscallDescriptor
 	return nil
 }
 
-// DispatchSysCall decodes the raw binary payload, identifies the target system call by Opcode,
+// DispatchSysCall identifies the target system call by Opcode,
 // executes its handler, and returns an IpcResponse structure.
-func (d *Dispatcher) DispatchSysCall(did interfaces.DID, payload []byte) IpcResponse {
-	if len(payload) < 2 {
-		return IpcResponse{
-			StatusCode: ErrInvalidArgs,
-			Opcode:     0,
-			Payload:    nil,
-			DID:        did,
-		}
-	}
-
-	opcode := binary.BigEndian.Uint16(payload[:2])
-	paramBody := payload[2:]
-
+func (d *Dispatcher) DispatchSysCall(did interfaces.DID, opcode uint16, payload []byte) IpcResponse {
 	d.mutex.RLock()
 	descriptor, exists := d.syscalls[opcode]
 	d.mutex.RUnlock()
@@ -140,7 +128,7 @@ func (d *Dispatcher) DispatchSysCall(did interfaces.DID, payload []byte) IpcResp
 		}
 	}
 
-	resPayload, statusCode := descriptor.Handler(did, paramBody)
+	resPayload, statusCode := descriptor.Handler(did, payload)
 	return IpcResponse{
 		StatusCode: statusCode,
 		Opcode:     opcode,

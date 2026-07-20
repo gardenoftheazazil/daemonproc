@@ -15,31 +15,22 @@ import (
 func FuzzControlCenterDispatcher(f *testing.F) {
 	dispatcher, _ := setupIntegrationEnvironment(f)
 
-	// Seed corpus.
-	f.Add([]byte{})
-	f.Add([]byte{0x01})
-
-	// Valid GetInviteKey Opcode.
-	validKeyReq := make([]byte, 2)
-	binary.BigEndian.PutUint16(validKeyReq, controlcenter.OpcodeGetInviteKey)
-	f.Add(validKeyReq)
+	// Seed corpus: uint16 opcode, []byte payload.
+	f.Add(controlcenter.OpcodeGetInviteKey, []byte{})
 
 	// Valid GetInviteKey with version payload.
-	validKeyVerReq := make([]byte, 6)
-	binary.BigEndian.PutUint16(validKeyVerReq[0:2], controlcenter.OpcodeGetInviteKey)
-	binary.BigEndian.PutUint32(validKeyVerReq[2:6], 0)
-	f.Add(validKeyVerReq)
+	verPayload := make([]byte, 4)
+	binary.BigEndian.PutUint32(verPayload, 0)
+	f.Add(controlcenter.OpcodeGetInviteKey, verPayload)
 
 	// Unknown Opcode.
-	unknownReq := make([]byte, 10)
-	binary.BigEndian.PutUint16(unknownReq, 0x7777)
-	f.Add(unknownReq)
+	f.Add(uint16(0x7777), []byte("arbitrary-data"))
 
-	f.Fuzz(func(t *testing.T, payload []byte) {
+	f.Fuzz(func(t *testing.T, opcode uint16, payload []byte) {
 		did := interfaces.DID(12345)
 
 		// DispatchSysCall must never panic regardless of payload content or length.
-		res := dispatcher.DispatchSysCall(did, payload)
+		res := dispatcher.DispatchSysCall(did, opcode, payload)
 
 		if res.DID != did {
 			t.Fatalf("expected DID %d in response, got: %d", did, res.DID)

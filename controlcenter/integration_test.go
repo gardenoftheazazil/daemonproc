@@ -47,43 +47,44 @@ func setupIntegrationEnvironment(tb testing.TB) (*controlcenter.Dispatcher, *inv
 	km.RegisterGenerator(0, genV1)
 
 	dispatcher := controlcenter.NewDispatcher()
-	if errReg := controlcenter.RegisterDefaultHandlers(dispatcher, km); errReg != nil {
+	if errReg := controlcenter.RegisterDefaultHandlers(dispatcher, km, &mockEgress{}); errReg != nil {
 		tb.Fatalf("failed to register default handlers: %v", errReg)
 	}
 
 	return dispatcher, km
 }
 
-func writeIPCControlPacket(w io.Writer, payload []byte) error {
+func writeIPCControlPacket(w io.Writer, opcode uint16, payload []byte) error {
 	length := len(payload)
-	header := uint16(length) | 0x8000
-	if err := binary.Write(w, binary.BigEndian, header); err != nil {
+	var header [4]byte
+	binary.BigEndian.PutUint16(header[0:2], opcode)
+	binary.BigEndian.PutUint16(header[2:4], uint16(length))
+	if _, err := w.Write(header[:]); err != nil {
 		return err
 	}
-	_, err := w.Write(payload)
-	return err
+	if length > 0 {
+		_, err := w.Write(payload)
+		return err
+	}
+	return nil
 }
 
 func readIPCControlPacket(r io.Reader) (opcode uint16, statusCode uint16, payload []byte, err error) {
-	var header uint16
-	if err := binary.Read(r, binary.BigEndian, &header); err != nil {
+	var header [6]byte
+	if _, err := io.ReadFull(r, header[:]); err != nil {
 		return 0, 0, nil, err
 	}
 
-	length := int(header & 0x7FFF)
+	opcode = binary.BigEndian.Uint16(header[0:2])
+	statusCode = binary.BigEndian.Uint16(header[2:4])
+	length := binary.BigEndian.Uint16(header[4:6])
+
 	buf := make([]byte, length)
 	if _, err := io.ReadFull(r, buf); err != nil {
 		return 0, 0, nil, err
 	}
 
-	if len(buf) < 4 {
-		return 0, 0, nil, io.ErrUnexpectedEOF
-	}
-
-	opcode = binary.BigEndian.Uint16(buf[0:2])
-	statusCode = binary.BigEndian.Uint16(buf[2:4])
-	payload = buf[4:]
-	return opcode, statusCode, payload, nil
+	return opcode, statusCode, buf, nil
 }
 
 func TestIPC_ControlCenter_MultiAppIntegration(t *testing.T) {
@@ -98,9 +99,9 @@ func TestIPC_ControlCenter_MultiAppIntegration(t *testing.T) {
 		_ = sessionManager.Close()
 	}()
 
-	sessionManager.SetControlCallback(func(did interfaces.DID, payload []byte) {
-		res := dispatcher.DispatchSysCall(did, payload)
-		_ = sessionManager.SendControlToLocal(did, res.Encode())
+	sessionManager.SetControlCallback(func(did interfaces.DID, opcode uint16, payload []byte) {
+		res := dispatcher.DispatchSysCall(did, opcode, payload)
+		_ = sessionManager.SendToLocal(did, res.Opcode, res.StatusCode, res.Payload)
 	})
 
 	numApps := 5
@@ -126,11 +127,8 @@ func TestIPC_ControlCenter_MultiAppIntegration(t *testing.T) {
 			}
 
 			// 1. Send valid GetInviteKey syscall request over IPC channel.
-			reqBody := make([]byte, 2)
-			binary.BigEndian.PutUint16(reqBody, controlcenter.OpcodeGetInviteKey)
-
 			_ = clientConn.SetDeadline(time.Now().Add(5 * time.Second))
-			if errWrite := writeIPCControlPacket(clientConn, reqBody); errWrite != nil {
+			if errWrite := writeIPCControlPacket(clientConn, controlcenter.OpcodeGetInviteKey, nil); errWrite != nil {
 				t.Errorf("app %d: failed to write control packet: %v", id, errWrite)
 				return
 			}
@@ -152,10 +150,7 @@ func TestIPC_ControlCenter_MultiAppIntegration(t *testing.T) {
 			}
 
 			// 2. Send unknown Opcode request.
-			unknownReq := make([]byte, 2)
-			binary.BigEndian.PutUint16(unknownReq, 0x8888)
-
-			if errWrite := writeIPCControlPacket(clientConn, unknownReq); errWrite != nil {
+			if errWrite := writeIPCControlPacket(clientConn, 0x8888, nil); errWrite != nil {
 				t.Errorf("app %d: failed to write unknown opcode packet: %v", id, errWrite)
 				return
 			}

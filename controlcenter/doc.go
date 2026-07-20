@@ -10,17 +10,16 @@
 // abuse, and marshals return values back to the originating transport layer.
 //
 // Request Frame Layout (Binary Wire Format):
-// Every system call request received from the local application must match the following 32-bit aligned header:
-//   - Packet Length (16 bits): Total length of the payload. The Most Significant Bit (MSB, 0x8000) represents
-//     the Control Flag (must be 1 for control messages, 0 for pure network proxying).
+// Every system call request received from the local application must match the following 4-byte header:
 //   - Command Type  (16 bits): The internal Opcode identifying the registered ABI function to execute.
+//   - Packet Length (16 bits): Total length of the parameter payload (0 to 65535 bytes).
 //   - Parameter Body (Variable): Dynamic raw binary values formatted strictly in Network Byte Order (Big Endian).
 //
 // Response Frame Layout (Binary Wire Format):
-// The evaluation output returned by the control center back to the local application follows a mirrored structure:
-//   - Packet Length (16 bits): Total length of the return frame including the header boundary.
-//   - Control Flag  (1 bit)  : Multiplexed within the length header (always 1 for daemon-originated management).
+// The evaluation output returned by the control center back to the local application follows a 6-byte header structure:
 //   - Command Type  (16 bits): The matching tracking Opcode that specifies which request this response belongs to.
+//   - Status Code   (16 bits): The execution status result code (0x0000 = Success).
+//   - Packet Length (16 bits): Total length of the return payload (0 to 65535 bytes).
 //   - Return Payload (Variable): Binary serialized execution results or platform-agnostic structures.
 //
 // ABI Subsystems and Functional Groups:

@@ -115,9 +115,9 @@ func TestIPC_ControlCenter_HeavyWorkload_Stress(t *testing.T) {
 		_ = sessionManager.Close()
 	}()
 
-	sessionManager.SetControlCallback(func(did interfaces.DID, payload []byte) {
-		res := dispatcher.DispatchSysCall(did, payload)
-		_ = sessionManager.SendControlToLocal(did, res.Encode())
+	sessionManager.SetControlCallback(func(did interfaces.DID, opcode uint16, payload []byte) {
+		res := dispatcher.DispatchSysCall(did, opcode, payload)
+		_ = sessionManager.SendToLocal(did, res.Opcode, res.StatusCode, res.Payload)
 	})
 
 	numConcurrentApps := 30
@@ -150,12 +150,11 @@ func TestIPC_ControlCenter_HeavyWorkload_Stress(t *testing.T) {
 			for reqIdx := range requestsPerApp {
 				targetOpcode := opcodes[reqIdx%len(opcodes)]
 
-				reqPayload := make([]byte, 6)
-				binary.BigEndian.PutUint16(reqPayload[0:2], targetOpcode)
-				binary.BigEndian.PutUint32(reqPayload[2:6], 0) // version 0 for v1 invite key.
+				reqPayload := make([]byte, 4)
+				binary.BigEndian.PutUint32(reqPayload[0:4], 0) // version 0 for v1 invite key.
 
 				_ = clientConn.SetDeadline(time.Now().Add(10 * time.Second))
-				if errWrite := writeIPCControlPacket(clientConn, reqPayload); errWrite != nil {
+				if errWrite := writeIPCControlPacket(clientConn, targetOpcode, reqPayload); errWrite != nil {
 					t.Errorf("app %d (did %d) req %d: write failed: %v", id, did, reqIdx, errWrite)
 					return
 				}

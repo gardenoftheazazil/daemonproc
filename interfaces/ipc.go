@@ -26,8 +26,8 @@ type IIpcListener interface {
 	Accept() (net.Conn, error)
 }
 
-// ControlCallback defines the signature for handling raw local control plane packets.
-type ControlCallback func(did DID, payload []byte)
+// ControlCallback defines the signature for handling raw local IPC frames.
+type ControlCallback func(did DID, opcode uint16, payload []byte)
 
 // IIpcSessionManager coordinates the lifecycle of local application connections
 // and maps them to their respective Dispatch IDs (DIDs) for multiplexing.
@@ -38,15 +38,9 @@ type IIpcSessionManager interface {
 	// UnregisterSession removes a session by its DID and closes the connection.
 	UnregisterSession(did DID) error
 
-	// SendToLocal routes decrypted network payloads to the specific local application.
-	SendToLocal(did DID, data []byte) error
+	// SendToLocal routes control or network payloads to the specific local application.
+	SendToLocal(did DID, opcode, statusCode uint16, data []byte) error
 
-	// SendControlToLocal sends a local control response to the specific local application.
-	SendControlToLocal(did DID, data []byte) error
-
-	// RouteToNetwork handles payloads received from local apps and forwards them to Egress.
-	RouteToNetwork(did DID, data []byte) error
-
-	// SetControlCallback registers a callback to receive incoming raw control plane packets.
+	// SetControlCallback registers a callback to receive incoming raw local IPC frames.
 	SetControlCallback(cb ControlCallback)
 }

@@ -13,9 +13,34 @@ import (
 
 // Standard Opcodes for ABI Subsystems.
 const (
+	// OpcodeEgressRoute identifies the system call to route outbound application data to the P2P egress network.
+	OpcodeEgressRoute uint16 = 0x0001
+
 	// OpcodeGetInviteKey identifies the system call to generate an authenticated invite key (Opcode Group 0x0200).
 	OpcodeGetInviteKey uint16 = 0x0201
 )
+
+// MakeEgressRouteHandler constructs a SyscallHandler for the OpcodeEgressRoute system call.
+// ABI parameter encoding for array/payload: [DataLength uint16][Data Bytes].
+func MakeEgressRouteHandler(egress interfaces.IEgress) SyscallHandler {
+	return func(did interfaces.DID, payload []byte) ([]byte, uint16) {
+		if egress == nil {
+			return nil, ErrInternalDaemon
+		}
+
+		data, _, status := ReadBytesParam(payload)
+		if status != Success {
+			return nil, status
+		}
+
+		err := egress.RouteToNetwork(did, data)
+		if err != nil {
+			return []byte(err.Error()), ErrInternalDaemon
+		}
+
+		return nil, Success
+	}
+}
 
 // MakeGetInviteKeyHandler constructs a SyscallHandler for the OpcodeGetInviteKey system call.
 // Parameter payload can specify a 4-byte uint32 BigEndian key version (defaults to 0 for v1 key type).

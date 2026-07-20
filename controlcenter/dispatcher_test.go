@@ -74,13 +74,8 @@ func TestDispatchSysCall_Success(t *testing.T) {
 		t.Fatalf("failed to register syscall: %v", err)
 	}
 
-	// Construct request payload: [2-byte Opcode][Parameter Bytes].
 	paramData := []byte("v1_profile")
-	reqPayload := make([]byte, 2+len(paramData))
-	binary.BigEndian.PutUint16(reqPayload[0:2], opcode)
-	copy(reqPayload[2:], paramData)
-
-	res := d.DispatchSysCall(targetDID, reqPayload)
+	res := d.DispatchSysCall(targetDID, opcode, paramData)
 
 	if res.StatusCode != controlcenter.Success {
 		t.Errorf("expected StatusCode Success (%d), got: %d", controlcenter.Success, res.StatusCode)
@@ -98,25 +93,6 @@ func TestDispatchSysCall_Success(t *testing.T) {
 	}
 }
 
-func TestDispatchSysCall_ShortPayload(t *testing.T) {
-	t.Parallel()
-
-	d := controlcenter.NewDispatcher()
-	did := interfaces.DID(10)
-
-	// Test 0-length payload.
-	resEmpty := d.DispatchSysCall(did, []byte{})
-	if resEmpty.StatusCode != controlcenter.ErrInvalidArgs {
-		t.Errorf("expected ErrInvalidArgs for empty payload, got: %d", resEmpty.StatusCode)
-	}
-
-	// Test 1-byte payload.
-	resShort := d.DispatchSysCall(did, []byte{0x01})
-	if resShort.StatusCode != controlcenter.ErrInvalidArgs {
-		t.Errorf("expected ErrInvalidArgs for 1-byte payload, got: %d", resShort.StatusCode)
-	}
-}
-
 func TestDispatchSysCall_UnknownOpcode(t *testing.T) {
 	t.Parallel()
 
@@ -124,10 +100,7 @@ func TestDispatchSysCall_UnknownOpcode(t *testing.T) {
 	did := interfaces.DID(15)
 
 	unknownOpcode := uint16(0x9999)
-	reqPayload := make([]byte, 2)
-	binary.BigEndian.PutUint16(reqPayload, unknownOpcode)
-
-	res := d.DispatchSysCall(did, reqPayload)
+	res := d.DispatchSysCall(did, unknownOpcode, []byte("data"))
 	if res.StatusCode != controlcenter.ErrUnknownOpcode {
 		t.Errorf("expected ErrUnknownOpcode, got: %d", res.StatusCode)
 	}
@@ -196,11 +169,10 @@ func TestDispatcher_ConcurrentAccess(t *testing.T) {
 			defer wg.Done()
 			for i := range 50 {
 				op := uint16(0x0100 + (i % 10))
-				buf := make([]byte, 4)
-				binary.BigEndian.PutUint16(buf[0:2], op)
-				binary.BigEndian.PutUint16(buf[2:4], uint16(wID))
+				buf := make([]byte, 2)
+				binary.BigEndian.PutUint16(buf[0:2], uint16(wID))
 
-				res := d.DispatchSysCall(interfaces.DID(wID), buf)
+				res := d.DispatchSysCall(interfaces.DID(wID), op, buf)
 				if res.StatusCode != controlcenter.Success {
 					t.Errorf("worker %d: unexpected status %d", wID, res.StatusCode)
 				}

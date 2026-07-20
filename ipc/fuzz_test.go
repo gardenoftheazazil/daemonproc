@@ -22,17 +22,15 @@ func (fuzzEgress) RouteToNetwork(srcDID interfaces.DID, data []byte) error {
 // or adversarial inputs, verifying there are no panics, buffer overflows, or memory leaks.
 func FuzzReadPacket(f *testing.F) {
 	// Add seed corpora.
-	// Seed 1: A valid data packet (isControl = false, payload = "hello").
-	// Header: 5 bytes length -> 0x0005.
-	f.Add([]byte{0x00, 0x05, 'h', 'e', 'l', 'l', 'o'})
+	// Seed 1: A valid packet (Opcode = 0x0001, payload = "hello", len = 5).
+	f.Add([]byte{0x00, 0x01, 0x00, 0x05, 'h', 'e', 'l', 'l', 'o'})
 
-	// Seed 2: A valid control packet (isControl = true, payload = `{"action":"test"}`).
-	// Length: 17 -> 0x0011. MSB set -> 0x8011.
-	f.Add([]byte{0x80, 0x11, '{', '"', 'a', 'c', 't', 'i', 'o', 'n', '"', ':', '"', 't', 'e', 's', 't', '"', '}'})
+	// Seed 2: A valid control packet (Opcode = 0x0201, payload = `{"action":"test"}`, len = 17).
+	f.Add([]byte{0x02, 0x01, 0x00, 0x11, '{', '"', 'a', 'c', 't', 'i', 'o', 'n', '"', ':', '"', 't', 'e', 's', 't', '"', '}'})
 
-	// Seed 3: Incomplete headers or headers exceeding maxPacketSize.
+	// Seed 3: Incomplete headers.
 	f.Add([]byte{0x00})
-	f.Add([]byte{0x80, 0xFF}) // 32767 length, but missing payload.
+	f.Add([]byte{0x00, 0x01, 0xFF, 0xFF}) // Max length, but missing payload.
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		sm := NewSessionManager(context.Background(), fuzzEgress{})
@@ -41,7 +39,7 @@ func FuzzReadPacket(f *testing.F) {
 		}()
 
 		r := bytes.NewReader(data)
-		isControl, payload, err := sm.readPacket(r)
+		opcode, payload, err := sm.readPacket(r)
 		if err != nil {
 			// Malformed packets are expected to return errors.
 			return
@@ -54,7 +52,7 @@ func FuzzReadPacket(f *testing.F) {
 
 		// Ensure we can successfully write the parsed packet back.
 		var buf bytes.Buffer
-		if writeErr := sm.writePacket(&buf, isControl, payload); writeErr != nil {
+		if writeErr := sm.writePacket(&buf, opcode, 0x0000, payload); writeErr != nil {
 			t.Errorf("failed to serialize parsed packet back: %v", writeErr)
 		}
 	})

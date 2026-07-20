@@ -7,6 +7,7 @@ package controlcenter
 import (
 	"errors"
 
+	"github.com/gardenoftheazazil/daemonproc/interfaces"
 	"github.com/gardenoftheazazil/daemonproc/invitekey"
 )
 
@@ -14,9 +15,20 @@ import (
 var ErrNilDispatcher = errors.New("dispatcher cannot be nil")
 
 // RegisterDefaultHandlers registers all default daemon ABI system calls into the provided Dispatcher.
-func RegisterDefaultHandlers(d *Dispatcher, km *invitekey.KeyManager) error {
+func RegisterDefaultHandlers(d *Dispatcher, km *invitekey.KeyManager, egress interfaces.IEgress) error {
 	if d == nil {
 		return ErrNilDispatcher
+	}
+
+	if egress != nil {
+		err := d.RegisterSysCall(OpcodeEgressRoute, SyscallDescriptor{
+			Opcode:  OpcodeEgressRoute,
+			Name:    "EgressRoute",
+			Handler: MakeEgressRouteHandler(egress),
+		})
+		if err != nil {
+			return err
+		}
 	}
 
 	if km != nil {
