@@ -342,7 +342,7 @@ func TestSessionManager_ConcurrentSendToLocal(t *testing.T) {
 		go func(writerID int) {
 			defer sendWG.Done()
 			for i := range msgsPerWriter {
-				payload := []byte(fmt.Sprintf("msg-writer-%d-idx-%d", writerID, i))
+				payload := fmt.Appendf(nil, "msg-writer-%d-idx-%d", writerID, i)
 				_ = sm.SendToLocal(did, 0x0001, 0x0000, payload)
 			}
 		}(w)
