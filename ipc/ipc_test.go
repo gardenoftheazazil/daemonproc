@@ -5,7 +5,6 @@
 package ipc
 
 import (
-	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -89,8 +88,7 @@ func TestIPCListenerLifecycle(t *testing.T) {
 	}
 
 	listener := NewIpcListener(addr)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	if err := listener.Start(ctx); err != nil {
 		t.Fatalf("failed to start listener: %v", err)
@@ -150,8 +148,7 @@ func TestSessionManager(t *testing.T) {
 	}
 
 	listener := NewIpcListener(addr)
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 
 	if err := listener.Start(ctx); err != nil {
 		t.Fatalf("failed to start listener: %v", err)
@@ -170,11 +167,9 @@ func TestSessionManager(t *testing.T) {
 	var clientConn net.Conn
 	var dialErr error
 	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	wg.Go(func() {
 		clientConn, dialErr = dialTestAddress(addr)
-	}()
+	})
 
 	serverConn, err := listener.Accept()
 	if err != nil {
